@@ -7,10 +7,10 @@ You can download them here:
 - Streamer: https://github.com/samp-incognito/samp-streamer-plugin/releases (Tested on v2.9.6)
 
 # Contents
-- [Contents](https://github.com/leamir/samp-vehicle-streamer#contents)
-- [Defines](https://github.com/leamir/samp-vehicle-streamer#defines)
-- [Functions](https://github.com/leamir/samp-vehicle-streamer#functions)
-- [Callbacks](https://github.com/leamir/samp-vehicle-streamer#callbacks)
+- [Contents](#contents)
+- [Defines](#defines)
+- [Functions](#functions)
+- [Callbacks](#callbacks)
 
 # Defines
 ### ⚠️ All defines must be placed before the vehicle streamer is included.
