@@ -2940,6 +2940,7 @@ public OnVehicleDamageStatusUpdate(vehicleid, playerid) {
     forward ALS_VS_OnVehicleDamageStatusUpdate(vehicleid, playerid);
 #endif
 
+forward OnDynamicVehicleUnoccupiedUpdate(DynamicVehicle:dynamicVehicleId, playerid, passenger_seat, Float:new_x, Float:new_y, Float:new_z, Float:vel_x, Float:vel_y, Float:vel_z);
 public OnUnoccupiedVehicleUpdate(vehicleid, playerid, passenger_seat, Float:new_x, Float:new_y, Float:new_z, Float:vel_x, Float:vel_y, Float:vel_z) {
     new DynamicVehicle:dynamicVehicleId = GetDynamicVehicleFromInternalVehicleId(vehicleid);
     if (dynamicVehicleId == INVALID_DYNAMIC_VEHICLE_ID)
