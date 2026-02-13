@@ -1,0 +1,10 @@
+{
+  "user": "leamir",
+  "repo": "samp-vehicle-streamer",
+  "include_path": ["."],
+  "dependencies": [
+    "sampctl/samp-stdlib",
+    "samp-incognito/samp-streamer-plugin",
+    "IllidanS4/PawnPlus"
+  ]
+}
