@@ -45,12 +45,12 @@ native HideObjectForPlayer(playerid, objectid);
 static enum e_ATTACHED_OBJECT_DATA
 {
     attachedObj_ObjectId,
-    attachedObj_OffsetX,
-    attachedObj_OffsetY,
-    attachedObj_OffsetZ,
-    attachedObj_RotationX,
-    attachedObj_RotationY,
-    attachedObj_RotationZ
+    Float:attachedObj_OffsetX,
+    Float:attachedObj_OffsetY,
+    Float:attachedObj_OffsetZ,
+    Float:attachedObj_RotationX,
+    Float:attachedObj_RotationY,
+    Float:attachedObj_RotationZ
 }
 #endif
 
