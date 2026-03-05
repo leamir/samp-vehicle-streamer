@@ -740,7 +740,7 @@ public int_VS_ProcessDynVehDespawns()
 {
     new currentTime = GetTickCount();
 
-    for_list(i : s_DynamicVehiclesDespawnScheduled)
+    for(new Iter:i = list_iter(s_DynamicVehiclesDespawnScheduled); iter_inside(i); iter_move_next(i)) // for_list(i : s_DynamicVehiclesDespawnScheduled)
     {
         new DynamicVehicle:dynamicVehicleId = DynamicVehicle:iter_get(i);
 
