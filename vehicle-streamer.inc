@@ -10,26 +10,20 @@
     #error Please include Streamer before this module.
 #endif
 
-#if !defined DYNAMIC_VEHICLES_SPAWN_QUEUE_PROCESS_INTERVAL
 #define DYNAMIC_VEHICLES_SPAWN_QUEUE_PROCESS_INTERVAL 250 // in milliseconds
 // The spawn queue spawns vehicles in order
 // Each run it will create as many vehicles as possible.
 // If the vehicle wasn't created due to reaching MAX_VEHICLES, the queue stops processing until the next interval.
 // The vehicle that coudn't be created remains at the front of the queue.
-#endif
 
-#if !defined DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL
 #define DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL 5000 // in milliseconds
 // Every interval, checks for vehicles that need to be despawned.
 // A vehicle needs to be despawned when there are no players in its area;
 // Vehicles need to have no players around for at least DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL milliseconds before being despawned.
-#endif
 
-#if !defined STREAMER_EXTRA_ID_DYNAMIC_VEHICLE
 #define STREAMER_EXTRA_ID_DYNAMIC_VEHICLE E_STREAMER_CUSTOM(1)
 // Just make sure you're not using this extra ID for something else in your gamemode.
 // It's used to link a dynamic vehicle to its area.
-#endif
 
 // #define VEHICLE_STREAMER_USE_ATTACHED_OBJECTS
 // This isn't enabled by default because it probably adds some overhead to the include, which some ppl might not want.
@@ -40,11 +34,13 @@
 // PLEASE DO NOT MODIFY BELOW // PLEASE DO NOT MODIFY BELOW // PLEASE DO NOT MODIFY BELOW //
 ////////////////////////////////////////////////////////////////////////////////////////////
 
+native ShowObjectForPlayer(playerid, objectid);
+native HideObjectForPlayer(playerid, objectid);
+
 #if defined VEHICLE_STREAMER_USE_ATTACHED_OBJECTS
     #if !defined HideObjectForPlayer || !defined ShowObjectForPlayer
         #error Attaching Objects to Dynamic Vehicle requires either YSF or open.mp v1.1.0.2612 or higher (Support for [Hide/Show]ObjectForPlayer)
     #endif
-
 
 static enum e_ATTACHED_OBJECT_DATA
 {
@@ -157,6 +153,8 @@ static enum e_DYNAMIC_VEHICLE_DATA
     #if defined GetVehicleLastDriver || defined HasVehicleBeenOccupied
     dynVeh_lastDriverId,
     #endif
+
+    List:dynVeh_playersInArea,
 
     #if defined DEBUG_DYNAMIC_VEHICLES
     STREAMER_TAG_3D_TEXT_LABEL:debug_3dTextId,
@@ -300,6 +298,11 @@ static int_clearDynamicVehicleData(array[])
         map_clear_deep(array[dynVeh_vehicleComponents]);
     else
         array[dynVeh_vehicleComponents] = map_new();
+
+    if (list_valid(array[dynVeh_playersInArea]))
+        list_clear_deep(array[dynVeh_playersInArea]);
+    else
+        array[dynVeh_playersInArea] = list_new();
 
     #if defined VEHICLE_STREAMER_USE_ATTACHED_OBJECTS
     if (list_valid(array[dynVeh_attachedObjects]))
@@ -898,6 +901,9 @@ public OnPlayerEnterDynamicArea(playerid, STREAMER_TAG_AREA:areaid) {
 
     dynVehData[dynVeh_playerCount]++;
 
+    if (list_find(dynVehData[dynVeh_playersInArea], playerid) == -1)
+        list_add(dynVehData[dynVeh_playersInArea], playerid);
+
     if (dynVehData[dynVeh_playerCount] == 1)
         AddDynamicVehicleToSpawnQueue(dynamicVehicleId);
 
@@ -923,21 +929,19 @@ public OnPlayerEnterDynamicArea(playerid, STREAMER_TAG_AREA:areaid) {
     forward ALS_VS_OnPlayerEnterDynamicArea(playerid, STREAMER_TAG_AREA:areaid);
 #endif
 
-public OnPlayerLeaveDynamicArea(playerid, STREAMER_TAG_AREA:areaid) {
-    new DynamicVehicle:dynamicVehicleId = DynamicVehicle:GetDynamicVehicleForAreaId(areaid);
+stock s_VS_ProcessDynamicAreaExit(playerid, DynamicVehicle:dynamicVehicleId)
+{
     if (!IsValidDynamicVehicle(dynamicVehicleId))
-    {
-        #if defined ALS_VS_OnPlayerLeaveDynamicArea
-            return ALS_VS_OnPlayerLeaveDynamicArea(playerid, areaid);
-        #else
-            return 1;
-        #endif
-    }
-    
+        return 0;
+
     new 
         dynVehData[e_DYNAMIC_VEHICLE_DATA];
 
     GetDynamicVehicleData(dynamicVehicleId, dynVehData);
+
+    new playerListPos = list_find(dynVehData[dynVeh_playersInArea], playerid);
+    if (playerListPos != -1)
+        list_remove(dynVehData[dynVeh_playersInArea], playerListPos);
 
     if (dynVehData[dynVeh_playerCount] > 0)
         dynVehData[dynVeh_playerCount]--;
@@ -949,6 +953,22 @@ public OnPlayerLeaveDynamicArea(playerid, STREAMER_TAG_AREA:areaid) {
     }
 
     UpdateDynamicVehicleData(dynamicVehicleId, dynVehData);
+    
+    return 1;
+}
+
+public OnPlayerLeaveDynamicArea(playerid, STREAMER_TAG_AREA:areaid) {
+    new DynamicVehicle:dynamicVehicleId = DynamicVehicle:GetDynamicVehicleForAreaId(areaid);
+    if (!IsValidDynamicVehicle(dynamicVehicleId))
+    {
+        #if defined ALS_VS_OnPlayerLeaveDynamicArea
+            return ALS_VS_OnPlayerLeaveDynamicArea(playerid, areaid);
+        #else
+            return 1;
+        #endif
+    }
+    
+    s_VS_ProcessDynamicAreaExit(playerid, dynamicVehicleId);
 
     #if defined DEBUG_DYNAMIC_VEHICLES
         UpdateDynamicVehicleDebugText(dynamicVehicleId);
@@ -968,6 +988,35 @@ public OnPlayerLeaveDynamicArea(playerid, STREAMER_TAG_AREA:areaid) {
 #define OnPlayerLeaveDynamicArea ALS_VS_OnPlayerLeaveDynamicArea
 #if defined ALS_VS_OnPlayerLeaveDynamicArea
     forward ALS_VS_OnPlayerLeaveDynamicArea(playerid, STREAMER_TAG_AREA:areaid);
+#endif
+
+public OnPlayerDisconnect(playerid, reason) {
+    // I'm not thinking enough rn to figure out a better way to do this
+    for(new Iter:i=pool_iter(g_DynamicVehicles);iter_inside(i);iter_move_next(i)) // for_pool(i, g_DynamicVehicles)
+    {
+        new DynamicVehicle:dynamicVehicleId = DynamicVehicle:iter_get_key(i);
+
+        new dynVehData[e_DYNAMIC_VEHICLE_DATA];
+        iter_get_arr(i, dynVehData, dynVeh_int_largestTag);
+
+        if (list_find(dynVehData[dynVeh_playersInArea], playerid) != -1)
+            s_VS_ProcessDynamicAreaExit(playerid, dynamicVehicleId);
+    }
+
+    #if defined ALS_VS_OnPlayerDisconnect
+        return ALS_VS_OnPlayerDisconnect(playerid, reason);
+    #else
+        return 1;
+    #endif
+}
+#if defined _ALS_OnPlayerDisconnect
+    #undef OnPlayerDisconnect
+#else
+    #define _ALS_OnPlayerDisconnect
+#endif
+#define OnPlayerDisconnect ALS_VS_OnPlayerDisconnect
+#if defined ALS_VS_OnPlayerDisconnect
+    forward ALS_VS_OnPlayerDisconnect(playerid, reason);
 #endif
 
 #if defined VEHICLE_STREAMER_USE_ATTACHED_OBJECTS
@@ -2959,7 +3008,7 @@ public OnUnoccupiedVehicleUpdate(vehicleid, playerid, passenger_seat, Float:new_
     }
 
     if (pawn_public_exists("OnDynamicVehicleUnoccupiedUpdate"))
-        pawn_call_public("OnUnoccupiedVehicleUpdate", "iiiffffff", _:dynamicVehicleId, playerid, passenger_seat, new_x, new_y, new_z, vel_x, vel_y, vel_z);
+        pawn_call_public("OnDynamicVehicleUnoccupiedUpdate", "iiiffffff", _:dynamicVehicleId, playerid, passenger_seat, new_x, new_y, new_z, vel_x, vel_y, vel_z);
 
     return 1;
 }
