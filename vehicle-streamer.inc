@@ -452,7 +452,8 @@ stock DestroyDynamicVehicle(DynamicVehicle:dynamicVehicleId)
             DestroyDynamic3DTextLabel(dynVehData[debug_3dTextId]);
     #endif
 
-    if ((new tmpid = list_find(s_DynamicVehiclesDespawnScheduled, _:dynamicVehicleId)) != -1)
+	new tmpid;
+    if ((tmpid = list_find(s_DynamicVehiclesDespawnScheduled, _:dynamicVehicleId)) != -1)
         list_remove(s_DynamicVehiclesDespawnScheduled, tmpid);
 
     if ((tmpid = list_find(s_DynamicVehiclesToSpawn, _:dynamicVehicleId)) != -1)
