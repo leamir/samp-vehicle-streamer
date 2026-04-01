@@ -35,17 +35,18 @@
 // This isn't enabled by default because it probably adds some overhead to the include, which some ppl might not want.
 // I haven't really tested whether there's noticiable overhead or not, but don't want to risk it (there probably is)
 
+// #define VEHICLE_STREAMER_ENABLE_NORMAL_ATTACHED_OBJECTS
+// Normal attached objects are broken due to HideObjectForPlayer and ShowObjectForPlayer not existing - unless you implement those, do not use them
+// This depends on VEHICLE_STREAMER_USE_ATTACHED_OBJECTS being defined as well
+// If the functions are available, normal attached objects will be enabled if you use attached objects.
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 // PLEASE DO NOT MODIFY BELOW // PLEASE DO NOT MODIFY BELOW // PLEASE DO NOT MODIFY BELOW //
 ////////////////////////////////////////////////////////////////////////////////////////////
 
-native ShowObjectForPlayer(playerid, objectid);
-native HideObjectForPlayer(playerid, objectid);
-
 #if defined VEHICLE_STREAMER_USE_ATTACHED_OBJECTS
-    #if !defined HideObjectForPlayer || !defined ShowObjectForPlayer
-        #error Attaching Objects to Dynamic Vehicle requires either YSF or open.mp v1.1.0.2612 or higher (Support for [Hide/Show]ObjectForPlayer)
+    #if defined HideObjectForPlayer && defined ShowObjectForPlayer
+        #define VEHICLE_STREAMER_ENABLE_NORMAL_ATTACHED_OBJECTS
     #endif
 
 static enum e_ATTACHED_OBJECT_DATA
@@ -329,7 +330,7 @@ static int_clearDynamicVehicleData(array[])
     {
         for(new Iter:i=list_iter(array[dynVeh_attachedDynamicObjects]);iter_inside(i);iter_move_next(i))
         {
-            new STREAMER_TAG_OBJECT:objId = iter_get(i);
+            new STREAMER_TAG_OBJECT:objId = STREAMER_TAG_OBJECT:iter_get(i);
             if (IsValidDynamicObject(objId))
                 DestroyDynamicObject(objId);
         }
@@ -636,27 +637,29 @@ public int_VS_ProcessDynVehSpawnQueue()
         #if defined VEHICLE_STREAMER_USE_ATTACHED_OBJECTS
 
         // Re-attach any previously-attached objects
-        new bool:isFirstPass = true;
-        vehicle_streamer_loop_all_players(new playerid) {
-            for(new Iter:i=list_iter(dynVehData[dynVeh_attachedObjects]);iter_inside(i);iter_move_next(i))
-            {
-                new 
-                    objData[e_ATTACHED_OBJECT_DATA];
-                iter_get_arr(i, objData, 7);
-                ShowObjectForPlayer(playerid, objData[attachedObj_ObjectId]);
-        
-                if (isFirstPass)
+            #if defined VEHICLE_STREAMER_ENABLE_NORMAL_ATTACHED_OBJECTS
+            new bool:isFirstPass = true;
+            vehicle_streamer_loop_all_players(new playerid) {
+                for(new Iter:i=list_iter(dynVehData[dynVeh_attachedObjects]);iter_inside(i);iter_move_next(i))
                 {
-                    AttachObjectToVehicle(
-                        objData[attachedObj_ObjectId], vehicleId,
-                        objData[attachedObj_OffsetX], objData[attachedObj_OffsetY], objData[attachedObj_OffsetZ],
-                        objData[attachedObj_RotationX], objData[attachedObj_RotationY], objData[attachedObj_RotationZ]
-                    );
+                    new 
+                        objData[e_ATTACHED_OBJECT_DATA];
+                    iter_get_arr(i, objData, 7);
+                    ShowObjectForPlayer(playerid, objData[attachedObj_ObjectId]);
+            
+                    if (isFirstPass)
+                    {
+                        AttachObjectToVehicle(
+                            objData[attachedObj_ObjectId], vehicleId,
+                            objData[attachedObj_OffsetX], objData[attachedObj_OffsetY], objData[attachedObj_OffsetZ],
+                            objData[attachedObj_RotationX], objData[attachedObj_RotationY], objData[attachedObj_RotationZ]
+                        );
+                    }
                 }
-            }
 
-            isFirstPass = false;
-        }
+                isFirstPass = false;
+            }
+            #endif
 
         for(new Iter:i=list_iter(dynVehData[dynVeh_attachedDynamicObjects]);iter_inside(i);iter_move_next(i))
         {
@@ -820,15 +823,17 @@ public int_VS_ProcessDynVehDespawns()
         #if defined VEHICLE_STREAMER_USE_ATTACHED_OBJECTS
 
         // Hide any previously-attached objects
-        vehicle_streamer_loop_all_players(new playerid) {
-            for(new Iter:x=list_iter(dynVehData[dynVeh_attachedObjects]);iter_inside(x);iter_move_next(x))
-            {
-                new 
-                    objData[e_ATTACHED_OBJECT_DATA];
-                iter_get_arr(x, objData, 7);
-                HideObjectForPlayer(playerid, objData[attachedObj_ObjectId]);
+            #if defined VEHICLE_STREAMER_ENABLE_NORMAL_ATTACHED_OBJECTS
+            vehicle_streamer_loop_all_players(new playerid) {
+                for(new Iter:x=list_iter(dynVehData[dynVeh_attachedObjects]);iter_inside(x);iter_move_next(x))
+                {
+                    new 
+                        objData[e_ATTACHED_OBJECT_DATA];
+                    iter_get_arr(x, objData, 7);
+                    HideObjectForPlayer(playerid, objData[attachedObj_ObjectId]);
+                }
             }
-        }
+            #endif
 
         for(new Iter:x=list_iter(dynVehData[dynVeh_attachedDynamicObjects]);iter_inside(x);iter_move_next(x))
         {
@@ -1027,79 +1032,81 @@ public OnPlayerDisconnect(playerid, reason) {
 #endif
 
 #if defined VEHICLE_STREAMER_USE_ATTACHED_OBJECTS
-    public OnPlayerConnect(playerid) {
-        for(new Iter:i=pool_iter(g_DynamicVehicles);iter_inside(i);iter_move_next(i))
-        {
-            new DynamicVehicle:dynamicVehicleId = DynamicVehicle:iter_get(i);
-
-            new 
-                dynVehData[e_DYNAMIC_VEHICLE_DATA], objCount;
-
-            GetDynamicVehicleData(dynamicVehicleId, dynVehData);
-
-            list_count(dynVehData[dynVeh_attachedObjects], objCount);
-
-            if (dynVehData[dynVeh_IsSpawned] && objCount > 0)
+    #if defined VEHICLE_STREAMER_ENABLE_NORMAL_ATTACHED_OBJECTS
+        public OnPlayerConnect(playerid) {
+            for(new Iter:i=pool_iter(g_DynamicVehicles);iter_inside(i);iter_move_next(i))
             {
-                for (new Iter:x=list_iter(dynVehData[dynVeh_attachedObjects]);iter_inside(x);iter_move_next(x))
-                {
-                    new 
-                        attachedObjectId = iter_get(x);
+                new DynamicVehicle:dynamicVehicleId = DynamicVehicle:iter_get(i);
 
-                    HideObjectForPlayer(playerid, attachedObjectId);
+                new 
+                    dynVehData[e_DYNAMIC_VEHICLE_DATA], objCount;
+
+                GetDynamicVehicleData(dynamicVehicleId, dynVehData);
+
+                list_count(dynVehData[dynVeh_attachedObjects], objCount);
+
+                if (dynVehData[dynVeh_IsSpawned] && objCount > 0)
+                {
+                    for (new Iter:x=list_iter(dynVehData[dynVeh_attachedObjects]);iter_inside(x);iter_move_next(x))
+                    {
+                        new 
+                            attachedObjectId = iter_get(x);
+
+                        HideObjectForPlayer(playerid, attachedObjectId);
+                    }
                 }
             }
-        }
 
-        #if defined ALS_VS_OnPlayerConnect
-            return ALS_VS_OnPlayerConnect(playerid);
+            #if defined ALS_VS_OnPlayerConnect
+                return ALS_VS_OnPlayerConnect(playerid);
+            #else
+                return 1;
+            #endif
+        }
+        #if defined _ALS_OnPlayerConnect
+            #undef OnPlayerConnect
         #else
-            return 1;
+            #define _ALS_OnPlayerConnect
         #endif
-    }
-    #if defined _ALS_OnPlayerConnect
-        #undef OnPlayerConnect
-    #else
-        #define _ALS_OnPlayerConnect
-    #endif
-    #define OnPlayerConnect ALS_VS_OnPlayerConnect
-    #if defined ALS_VS_OnPlayerConnect
-        forward ALS_VS_OnPlayerConnect(playerid);
-    #endif
+        #define OnPlayerConnect ALS_VS_OnPlayerConnect
+        #if defined ALS_VS_OnPlayerConnect
+            forward ALS_VS_OnPlayerConnect(playerid);
+        #endif
 
-    stock ALS_VS_DestroyObject(objectid) {
-        // Remove from all vehicles list (if attached)
-        for(new Iter:i=pool_iter(g_DynamicVehicles);iter_inside(i);iter_move_next(i))
-        {
-            new DynamicVehicle:dynamicVehicleId = DynamicVehicle:iter_get(i);
-
-            new 
-                dynVehData[e_DYNAMIC_VEHICLE_DATA], objCount;
-
-            GetDynamicVehicleData(dynamicVehicleId, dynVehData);
-
-            list_count(dynVehData[dynVeh_attachedObjects], objCount);
-
-            if (objCount > 0)
+        stock ALS_VS_DestroyObject(objectid) {
+            // Remove from all vehicles list (if attached)
+            for(new Iter:i=pool_iter(g_DynamicVehicles);iter_inside(i);iter_move_next(i))
             {
-                new index = list_find(dynVehData[dynVeh_attachedObjects], objectid);
-                if (index != -1)
+                new DynamicVehicle:dynamicVehicleId = DynamicVehicle:iter_get(i);
+
+                new 
+                    dynVehData[e_DYNAMIC_VEHICLE_DATA], objCount;
+
+                GetDynamicVehicleData(dynamicVehicleId, dynVehData);
+
+                list_count(dynVehData[dynVeh_attachedObjects], objCount);
+
+                if (objCount > 0)
                 {
-                    list_remove(dynVehData[dynVeh_attachedObjects], index);
-                    UpdateDynamicVehicleData(dynamicVehicleId, dynVehData);
-                    break;
+                    new index = list_find(dynVehData[dynVeh_attachedObjects], objectid);
+                    if (index != -1)
+                    {
+                        list_remove(dynVehData[dynVeh_attachedObjects], index);
+                        UpdateDynamicVehicleData(dynamicVehicleId, dynVehData);
+                        break;
+                    }
                 }
             }
+        
+            return DestroyObject(objectid);
         }
-    
-        return DestroyObject(objectid);
-    }
-    #if defined _ALS_DestroyObject
-        #undef DestroyObject
-    #else
-        #define _ALS_DestroyObject
+        #if defined _ALS_DestroyObject
+            #undef DestroyObject
+        #else
+            #define _ALS_DestroyObject
+        #endif
+        #define DestroyObject ALS_VS_DestroyObject
     #endif
-    #define DestroyObject ALS_VS_DestroyObject
 
     stock ALS_VS_DestroyDynamicObject(objectid) {
         // Remove from all vehicles list (if attached)
@@ -1139,51 +1146,53 @@ public OnPlayerDisconnect(playerid, reason) {
 /* Vehicle functions */
 
 #if defined VEHICLE_STREAMER_USE_ATTACHED_OBJECTS
-stock AttachObjectToDynamicVehicle(objectid, DynamicVehicle:dynamicVehicleId, Float:offsetX, Float:offsetY, Float:offsetZ, Float:rotationX, Float:rotationY, Float:rotationZ)
-{
-    if (!IsValidDynamicVehicle(dynamicVehicleId))
-        return 0;
-
-    if (!IsValidObject(objectid))
-        return 0;
-
-    new 
-        dynVehData[e_DYNAMIC_VEHICLE_DATA];
-
-    GetDynamicVehicleData(dynamicVehicleId, dynVehData);
-
-    new
-        array[e_ATTACHED_OBJECT_DATA];
-    array[attachedObj_ObjectId] = objectid;
-    array[attachedObj_OffsetX] = offsetX;
-    array[attachedObj_OffsetY] = offsetY;
-    array[attachedObj_OffsetZ] = offsetZ;
-    array[attachedObj_RotationX] = rotationX;
-    array[attachedObj_RotationY] = rotationY;
-    array[attachedObj_RotationZ] = rotationZ;
-
-    list_add_arr(dynVehData[dynVeh_attachedObjects], array, .size = 7);
-
-    UpdateDynamicVehicleData(dynamicVehicleId, dynVehData);
-
-    if (dynVehData[dynVeh_IsSpawned])
+    #if defined VEHICLE_STREAMER_ENABLE_NORMAL_ATTACHED_OBJECTS
+    stock AttachObjectToDynamicVehicle(objectid, DynamicVehicle:dynamicVehicleId, Float:offsetX, Float:offsetY, Float:offsetZ, Float:rotationX, Float:rotationY, Float:rotationZ)
     {
-        AttachObjectToVehicle(
-            objectid,
-            dynVehData[dynVeh_internalVehicleId],
-            offsetX, offsetY, offsetZ,
-            rotationX, rotationY, rotationZ
-        );
-    }
-    else
-    { // if car is not spawned, object should not be visible
-        vehicle_streamer_loop_all_players(new playerid) {
-            HideObjectForPlayer(playerid, objectid);
-        }
-    }
+        if (!IsValidDynamicVehicle(dynamicVehicleId))
+            return 0;
 
-    return 1;
-}
+        if (!IsValidObject(objectid))
+            return 0;
+
+        new 
+            dynVehData[e_DYNAMIC_VEHICLE_DATA];
+
+        GetDynamicVehicleData(dynamicVehicleId, dynVehData);
+
+        new
+            array[e_ATTACHED_OBJECT_DATA];
+        array[attachedObj_ObjectId] = objectid;
+        array[attachedObj_OffsetX] = offsetX;
+        array[attachedObj_OffsetY] = offsetY;
+        array[attachedObj_OffsetZ] = offsetZ;
+        array[attachedObj_RotationX] = rotationX;
+        array[attachedObj_RotationY] = rotationY;
+        array[attachedObj_RotationZ] = rotationZ;
+
+        list_add_arr(dynVehData[dynVeh_attachedObjects], array, .size = 7);
+
+        UpdateDynamicVehicleData(dynamicVehicleId, dynVehData);
+
+        if (dynVehData[dynVeh_IsSpawned])
+        {
+            AttachObjectToVehicle(
+                objectid,
+                dynVehData[dynVeh_internalVehicleId],
+                offsetX, offsetY, offsetZ,
+                rotationX, rotationY, rotationZ
+            );
+        }
+        else
+        { // if car is not spawned, object should not be visible
+            vehicle_streamer_loop_all_players(new playerid) {
+                HideObjectForPlayer(playerid, objectid);
+            }
+        }
+
+        return 1;
+    }
+    #endif
 
 stock AttachDynamicObjectToDynamicVehicle(STREAMER_TAG_OBJECT:dynamicObjectId, DynamicVehicle:vehicleDynamicId, Float:offsetX, Float:offsetY, Float:offsetZ, Float:rotationX, Float:rotationY, Float:rotationZ)
 {
