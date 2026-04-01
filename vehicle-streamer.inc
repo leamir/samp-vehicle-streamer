@@ -18,14 +18,14 @@
 // If the vehicle wasn't created due to reaching MAX_VEHICLES, the queue stops processing until the next interval.
 // The vehicle that coudn't be created remains at the front of the queue.
 
-#if defined DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL
+#if !defined DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL
 	#define DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL 5000 // in milliseconds
 #endif
 // Every interval, checks for vehicles that need to be despawned.
 // A vehicle needs to be despawned when there are no players in its area;
 // Vehicles need to have no players around for at least DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL milliseconds before being despawned.
 
-#if defined STREAMER_EXTRA_ID_DYNAMIC_VEHICLE
+#if !defined STREAMER_EXTRA_ID_DYNAMIC_VEHICLE
 	#define STREAMER_EXTRA_ID_DYNAMIC_VEHICLE E_STREAMER_CUSTOM(1)
 #endif
 // Just make sure you're not using this extra ID for something else in your gamemode.
