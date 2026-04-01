@@ -20,6 +20,7 @@
 
 #if defined DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL
 	#define DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL 5000 // in milliseconds
+#endif
 // Every interval, checks for vehicles that need to be despawned.
 // A vehicle needs to be despawned when there are no players in its area;
 // Vehicles need to have no players around for at least DYNAMIC_VEHICLES_DESPAWN_CHECK_INTERVAL milliseconds before being despawned.
